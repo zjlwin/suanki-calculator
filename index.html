@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>算迹计算器 · 可搜索历史记录</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFFFFF; --bg-soft:#F9F9FB; --key:#F5F5F5; --key-dark:#ECECEC;
+    --border:#E5E5E5; --text:#1E1E1E; --text-2:#666666; --text-3:#999999; --text-4:#B3B3B3;
+    --accent:#A259FF; --accent-tint:#F3EBFF; --accent-deep:#7C3AED;
+    --red:#EF4444; --green:#10B981;
+    --shadow-card:0 1px 2px rgba(15,20,25,.04), 0 4px 12px rgba(15,20,25,.06);
+    --sans:"Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    --mono:"JetBrains Mono","Cascadia Mono",Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  button{font-family:inherit;border:none;background:none;cursor:pointer;color:inherit}
+  input{font-family:inherit;border:none;outline:none;background:transparent}
+  svg{display:block;flex-shrink:0}
+
+  .app{max-width:1440px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+
+  /* ── 顶部导航 ─────────────────────────── */
+  .nav{height:64px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 32px}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-tile{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+  .logo-name{font-size:17px;font-weight:600;color:var(--text)}
+  .badge-free{padding:3px 10px;border-radius:100px;background:var(--key);font-size:11px;font-weight:500;color:var(--text-2)}
+  .nav-actions{display:flex;align-items:center;gap:12px}
+  .btn-ghost{padding:8px 16px;border-radius:8px;border:1px solid var(--border);font-size:13px;font-weight:500;color:var(--text-2)}
+  .btn-ghost:hover{background:var(--bg-soft)}
+
+  /* ── 主内容 ──────────────────────────── */
+  .content{flex:1;display:flex;gap:24px;padding:32px;align-items:stretch}
+
+  /* 计算器卡片 */
+  .calc-card{width:420px;flex-shrink:0;display:flex;flex-direction:column;gap:20px;padding:24px;
+    background:var(--bg);border-radius:12px;box-shadow:var(--shadow-card)}
+  .mode-row{display:flex;gap:8px}
+  .mode-chip{padding:6px 14px;border-radius:100px;font-size:13px;font-weight:500;color:var(--text-2);background:var(--key)}
+  .mode-chip.active{background:var(--accent-tint);color:var(--accent)}
+  .display{display:flex;flex-direction:column;gap:6px}
+  .expr{font-family:var(--mono);font-size:15px;color:var(--text-3);text-align:right;min-height:22px;word-break:break-all}
+  .result{font-family:var(--mono);font-size:44px;font-weight:700;color:var(--text);text-align:right;min-height:54px;word-break:break-all}
+  .save-row{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+  .save-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .save-text{font-size:12px;color:var(--text-4)}
+  .keypad{display:flex;flex-wrap:wrap;gap:12px}
+  .key{width:84px;height:52px;border-radius:8px;background:var(--key);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:18px;font-weight:500;color:var(--text);transition:background .12s}
+  .key:hover{background:#ECECEC}
+  .key:active{transform:scale(.96)}
+  .key.op{font-size:20px}
+  .key.clear{color:var(--red)}
+  .key.equals{background:var(--accent);color:#FFFFFF;font-size:20px;font-weight:700}
+  .key.equals:hover{background:#9147F0}
+  .search-tip{margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:8px;background:var(--bg-soft)}
+  .search-tip p{font-size:12px;line-height:18px;color:var(--text-2)}
+
+  /* 科学计算面板 */
+  .sci-wrap{display:none;flex-direction:column;gap:8px}
+  .sci-wrap.show{display:flex}
+  .sci-head{display:flex;align-items:center;justify-content:space-between}
+  .sci-label{font-size:12px;color:var(--text-4)}
+  .deg-toggle{padding:4px 10px;border-radius:100px;background:var(--key);font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text-2)}
+  .deg-toggle:hover{background:#ECECEC}
+  .sci-grid{display:flex;flex-wrap:wrap;gap:8px}
+  .skey{width:68px;height:44px;border-radius:8px;background:var(--key);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:14px;font-weight:500;color:var(--text);transition:background .12s}
+  .skey:hover{background:#ECECEC}
+  .skey:active{transform:scale(.96)}
+
+  /* 历史面板 */
+  .panel{flex:1;display:flex;flex-direction:column;gap:14px;padding:24px;background:var(--bg-soft);border-radius:12px}
+  .panel-head{display:flex;align-items:center;justify-content:space-between}
+  .panel-title-group{display:flex;align-items:center;gap:10px}
+  .panel-title{font-size:18px;font-weight:600;color:var(--text)}
+  .count-chip{padding:3px 10px;border-radius:100px;background:var(--key-dark);font-size:12px;font-weight:500;color:var(--text-2)}
+  .btn-clear{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-3)}
+  .btn-clear:hover{color:var(--red)}
+  .search-bar{height:46px;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--bg);
+    border:1px solid var(--border);border-radius:10px}
+  .search-bar:focus-within{border-color:var(--accent)}
+  .search-input{flex:1;font-size:15px;font-weight:500;color:var(--text)}
+  .search-input::placeholder{color:var(--text-4);font-weight:400}
+  .kbd{padding:2px 6px;border-radius:6px;border:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--text-3)}
+  .filter-row{display:flex;gap:8px}
+  .filter-chip{padding:5px 12px;border-radius:100px;background:var(--bg);font-size:12px;font-weight:500;color:var(--text-2)}
+  .filter-chip.active{background:var(--accent-tint);color:var(--accent)}
+  .meta-row{display:flex;align-items:center;justify-content:space-between}
+  .meta-match{font-size:13px;font-weight:500;color:var(--accent)}
+  .meta-neutral{font-size:13px;font-weight:500;color:var(--text-3)}
+  .meta-sort{font-size:12px;color:var(--text-3)}
+  .list{display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+  .item{display:flex;flex-direction:column;gap:8px;padding:14px;background:var(--bg);border-radius:8px;transition:opacity .15s}
+  .item.dim{opacity:.55}
+  .item-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .item-expr{font-family:var(--mono);font-size:14px;color:var(--text-2);word-break:break-all}
+  .item-time{font-size:12px;color:var(--text-4);flex-shrink:0}
+  .item-result{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--text);word-break:break-all}
+  .item-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .icon-btn{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--text-3)}
+  .icon-btn:hover{background:var(--bg-soft);color:var(--text-2)}
+  .icon-btn.fav-on{color:var(--accent)}
+  .icon-btn.fav-on svg path{stroke:var(--accent);fill:var(--accent-tint)}
+  .note-chip{align-self:flex-start;padding:4px 10px;border-radius:100px;background:var(--accent-tint);
+    font-size:12px;font-weight:500;color:var(--accent-deep);cursor:text}
+  .note-chip.note-add{background:transparent;border:1px dashed var(--border);color:var(--text-4)}
+  .group-label{font-size:12px;color:var(--text-4)}
+  .btn-loadmore{height:32px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:500;color:var(--text-2);background:transparent}
+  .btn-loadmore:hover{background:var(--bg)}
+  .empty{padding:40px 0;text-align:center;font-size:13px;color:var(--text-3)}
+
+  /* Toast */
+  .toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(8px);padding:10px 18px;
+    background:var(--text);color:#fff;font-size:13px;border-radius:8px;opacity:0;pointer-events:none;transition:.2s;z-index:9}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (max-width:1080px){
+    .content{flex-direction:column;align-items:center}
+    .calc-card{width:100%;max-width:420px}
+    .panel{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 顶部导航 -->
+  <nav class="nav">
+    <div class="logo">
+      <div class="logo-tile">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2" stroke="#FFFFFF" stroke-width="2"/><path d="M8 7h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><path d="M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <span class="logo-name">算迹计算器</span>
+      <span class="badge-free">免登录可用</span>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-ghost" id="btnExport">导出记录</button>
+      <button class="btn-ghost" onclick="toast('登录仅为云同步，不登录也可正常使用')">登录</button>
+    </div>
+  </nav>
+
+  <div class="content">
+
+    <!-- 计算器卡片 -->
+    <section class="calc-card">
+      <div class="mode-row">
+        <button class="mode-chip active" data-m="std">标准</button>
+        <button class="mode-chip" data-m="sci">科学</button>
+        <button class="mode-chip" data-m="rate">汇率</button>
+      </div>
+      <div class="display">
+        <div class="expr" id="expr">0</div>
+        <div class="result" id="result">0</div>
+        <div class="save-row">
+          <span class="save-dot"></span>
+          <span class="save-text" id="saveText">已自动保存至本机 · 无需登录</span>
+        </div>
+      </div>
+      <!-- 科学函数键盘（科学模式显示） -->
+      <div class="sci-wrap" id="sciWrap">
+        <div class="sci-head">
+          <span class="sci-label">科学函数</span>
+          <button class="deg-toggle" id="degToggle">DEG · 角度</button>
+        </div>
+        <div class="sci-grid" id="sciGrid">
+          <button class="skey" data-s="(">(</button>
+          <button class="skey" data-s=")">)</button>
+          <button class="skey" data-s="π">π</button>
+          <button class="skey" data-s="e">e</button>
+          <button class="skey" data-s="^">^</button>
+          <button class="skey" data-s="sin(">sin</button>
+          <button class="skey" data-s="cos(">cos</button>
+          <button class="skey" data-s="tan(">tan</button>
+          <button class="skey" data-s="sqrt">√</button>
+          <button class="skey" data-s="x2">x²</button>
+          <button class="skey" data-s="ln(">ln</button>
+          <button class="skey" data-s="log(">log</button>
+          <button class="skey" data-s="fact">n!</button>
+          <button class="skey" data-s="inv">1/x</button>
+          <button class="skey" data-s="ANS">ANS</button>
+        </div>
+      </div>
+
+      <div class="keypad" id="keypad">
+        <button class="key clear" data-k="C">C</button>
+        <button class="key" data-k="back" aria-label="退格">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 5H9l-6 7 6 7h11a2 2 0 002-2V7a2 2 0 00-2-2z" stroke="#1E1E1E" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9l6 6M18 9l-6 6" stroke="#1E1E1E" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="key op" data-k="%">%</button>
+        <button class="key op" data-k="÷">÷</button>
+        <button class="key" data-k="7">7</button>
+        <button class="key" data-k="8">8</button>
+        <button class="key" data-k="9">9</button>
+        <button class="key op" data-k="×">×</button>
+        <button class="key" data-k="4">4</button>
+        <button class="key" data-k="5">5</button>
+        <button class="key" data-k="6">6</button>
+        <button class="key op" data-k="-">-</button>
+        <button class="key" data-k="1">1</button>
+        <button class="key" data-k="2">2</button>
+        <button class="key" data-k="3">3</button>
+        <button class="key op" data-k="+">+</button>
+        <button class="key" data-k="±">±</button>
+        <button class="key" data-k="0">0</button>
+        <button class="key op" data-k=".">.</button>
+        <button class="key equals" data-k="=">=</button>
+      </div>
+      <div class="search-tip">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#666666" stroke-width="2"/><path d="M16.5 16.5L21 21" stroke="#666666" stroke-width="2" stroke-linecap="round"/></svg>
+        <p>在右侧搜索框输入关键词，可按表达式、结果、备注快速找回任意一条历史计算</p>
+      </div>
+    </section>
+
+    <!-- 历史面板 -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title-group">
+          <span class="panel-title">历史记录</span>
+          <span class="count-chip" id="countChip">0 条</span>
+        </div>
+        <button class="btn-clear" id="btnClear">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          清空记录
+        </button>
+      </div>
+
+      <div class="search-bar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#666666" stroke-width="2"/><path d="M16.5 16.5L21 21" stroke="#666666" stroke-width="2" stroke-linecap="round"/></svg>
+        <input class="search-input" id="searchInput" placeholder="搜索表达式、结果或备注…" autocomplete="off">
+        <span class="kbd">Esc</span>
+      </div>
+
+      <div class="filter-row" id="filterRow">
+        <button class="filter-chip active" data-f="all">全部</button>
+        <button class="filter-chip" data-f="fav">已收藏</button>
+        <button class="filter-chip" data-f="today">今天</button>
+        <button class="filter-chip" data-f="week">本周</button>
+      </div>
+
+      <div class="meta-row">
+        <span class="meta-neutral" id="metaText">全部记录</span>
+        <span class="meta-sort">按时间排序</span>
+      </div>
+
+      <div class="list" id="list"></div>
+      <button class="btn-loadmore" id="btnLoadMore" onclick="toast('已展示全部本地记录')">加载更早的记录</button>
+    </section>
+
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── 状态 ─────────────────────────────── */
+const LS_KEY = 'suanki_history_v1';
+const DAY = 86400000;
+let expr = '';            // 当前表达式（显示用符号 ×÷）
+let history = load();     // {id, expr, result, note, fav, ts}
+let query = '';
+let filter = 'all';
+let deg = true;           // 三角函数角度制
+let lastAnswer = null;    // ANS 引用的上次结果
+
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  const now = Date.now();
+  return [ // 首次打开的示例数据，与设计稿一致；清空后即为真实数据
+    {id:1, expr:'850,000 × 3.85% ÷ 12', result:'2,727.08', note:'房贷月供 · 利率 3.85%', fav:false, ts:now-3600e3},
+    {id:2, expr:'20,000 × 2.5% ÷ 365 × 92', result:'126.03', note:'货基收益 · 七日年化利率 2.5%', fav:false, ts:now-DAY-7200e3},
+    {id:3, expr:'100,000 × (1 + 3.5%) ^ 3', result:'110,871.79', note:'三年定存复利 · 利率 3.5%', fav:false, ts:now-3*DAY},
+    {id:4, expr:'1,280 + 3,560 + 940', result:'5,780', note:'', fav:false, ts:now-6*3600e3},
+    {id:5, expr:'365 × 24', result:'8,760', note:'', fav:false, ts:now-DAY}
+  ];
+}
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(history)); }catch(e){} }
+
+/* ── 工具 ─────────────────────────────── */
+const $ = s => document.querySelector(s);
+const exprEl=$('#expr'), resultEl=$('#result'), listEl=$('#list'),
+      metaEl=$('#metaText'), countEl=$('#countChip'), searchEl=$('#searchInput');
+
+function fmt(n){
+  if(!isFinite(n)) return '错误';
+  const r = Math.round(n*100)/100;
+  return r.toLocaleString('en-US',{maximumFractionDigits:2});
+}
+/* 除法除不尽时：小数部分至少显示 10 位（整除结果仍按常规格式） */
+function fmtAuto(n){
+  if(n===null||!isFinite(n)) return fmt(n);
+  if(expr.includes('÷')){
+    const a=Math.abs(n);
+    if(a>0 && a<1e15){
+      const scaled=n*1e10;
+      const exact=Math.abs(scaled-Math.round(scaled))<=Math.max(1e-9, Math.abs(scaled)*1e-12);
+      if(!exact){
+        const neg=n<0;
+        const ip=Math.floor(a).toLocaleString('en-US');
+        const fp=(a-Math.floor(a)).toFixed(10).slice(2);
+        return (neg?'-':'')+ip+'.'+fp;
+      }
+      /* 除尽：按真实值显示（最多 10 位小数，去尾零） */
+      return n.toLocaleString('en-US',{maximumFractionDigits:10});
+    }
+  }
+  return fmt(n);
+}
+function timeLabel(ts){
+  const d=new Date(ts), now=new Date();
+  const sameDay=(a,b)=>a.toDateString()===b.toDateString();
+  if(sameDay(d,now)) return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  if(sameDay(new Date(ts+DAY),now)) return '昨天';
+  if(now-ts < 7*DAY){
+    const wk=['周日','周一','周二','周三','周四','周五','周六'];
+    return wk[d.getDay()];
+  }
+  return (d.getMonth()+1)+'/'+d.getDate();
+}
+let toastTimer;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+/* ── 计算器 ───────────────────────────── */
+function renderCalc(){
+  exprEl.textContent = expr || '0';
+}
+function fact(n){
+  if(n<0||n>170||n%1!==0) return NaN;
+  let r=1; for(let i=2;i<=n;i++) r*=i; return r;
+}
+const toRad = x => deg ? x*Math.PI/180 : x;
+
+function evaluate(){
+  if(!expr) return null;
+  // 显示符号 → 可求值表达式：×÷%、^ 为幂，√ sin cos tan ln log n! π e
+  let s = expr.replace(/,/g,'')
+    .replace(/×/g,'*').replace(/÷/g,'/')
+    .replace(/(\d+(?:\.\d+)?)%/g,'($1/100)')
+    .replace(/√\(/g,'Q(')
+    .replace(/sin\(/g,'SX(').replace(/cos\(/g,'CX(').replace(/tan\(/g,'TX(')
+    .replace(/ln\(/g,'LN(').replace(/log\(/g,'LG(')
+    .replace(/(\d+(?:\.\d+)?)!/g,'F($1)')
+    .replace(/π/g,'P').replace(/\be\b/g,'E')
+    .replace(/\^/g,'**')
+    .replace(/\)\(/g,')*(')
+    .replace(/(\d)\(/g,'$1*(')
+    .replace(/(\d|\))([PE])/g,'$1*$2')
+    .replace(/([PE])\(/g,'$1*(')
+    .replace(/(\d)(S|C|T|L|G|Q)/g,'$1*$2');
+  if(!/^[0-9+\-*/().\sSXCTNLGQFPE]*$/.test(s)) return null;
+  try{
+    const f=Function('SX','CX','TX','LN','LG','Q','F','P','E','"use strict";return ('+s+')');
+    return f(x=>Math.sin(toRad(x)), x=>Math.cos(toRad(x)), x=>Math.tan(toRad(x)),
+             x=>Math.log(x), x=>Math.log10(x), x=>Math.sqrt(x), fact,
+             Math.PI, Math.E);
+  }catch(e){ return null; }
+}
+function tailNum(){
+  const m=expr.match(/(\d+\.?\d*)$/);
+  return m ? {start:expr.length-m[1].length, num:m[1]} : null;
+}
+const endsOperand = () => /[\d)]$/.test(expr);
+function pressSci(k){
+  if(k==='sqrt'){                       // √：作用于末尾数字，否则插入 √(
+    const t=tailNum();
+    expr = t ? expr.slice(0,t.start)+'√('+t.num+')' : expr+'√(';
+  } else if(k==='inv'){                 // 1/x：作用于末尾数字
+    const t=tailNum();
+    expr = t ? expr.slice(0,t.start)+'1/('+t.num+')' : expr+'1/(';
+  } else if(k==='x2'){                  // x²：末尾是数字或 ) 时追加 ^2
+    if(endsOperand()) expr+='^2';
+  } else if(k==='fact'){                // n!
+    if(endsOperand()) expr+='!';
+  } else if(k==='ANS'){
+    if(lastAnswer!==null) expr+=String(lastAnswer);
+  } else if(k===')'){
+    const open=(expr.match(/\(/g)||[]).length, close=(expr.match(/\)/g)||[]).length;
+    if(open>close) expr+=')';
+  } else {
+    expr+=k;                            // ( π e ^ sin( cos( tan( ln( log(
+  }
+  const v=evaluate();
+  resultEl.textContent = v===null ? (expr||'0') : fmtAuto(v);
+  renderCalc();
+}
+function press(k){
+  if(k==='C'){ expr=''; resultEl.textContent='0'; renderCalc(); return; }
+  if(k==='back'){ expr=expr.slice(0,-1); renderCalc(); return; }
+  if(k==='±'){
+    const m=expr.match(/(\d+\.?\d*)$/);
+    if(m){
+      const start=expr.length-m[1].length;
+      if(expr[start-1]==='-') expr=expr.slice(0,start-1)+m[1];
+      else expr=expr.slice(0,start)+'(-'+m[1]+')';
+    } else if(!expr) expr='-';
+    renderCalc(); return;
+  }
+  if(k==='='){
+    const v=evaluate();
+    if(v===null){ resultEl.textContent='错误'; return; }
+    const r=fmtAuto(v);
+    resultEl.textContent=r;
+    lastAnswer=v;
+    if(expr){
+      history.unshift({id:Date.now(), expr, result:r, note:'', fav:false, ts:Date.now()});
+      save(); renderList();
+    }
+    return;
+  }
+  // 数字与运算符
+  if('+-×÷'.includes(k) && (!expr || '+-×÷'.includes(expr.slice(-1)))) {
+    if(!expr && k!=='-') return;
+    expr = expr.slice(0,-1) + k;  // 替换连续运算符
+  } else {
+    expr += k;
+  }
+  const v=evaluate();
+  resultEl.textContent = v===null ? (expr||'0') : fmtAuto(v);
+  renderCalc();
+}
+$('#keypad').addEventListener('click', e=>{
+  const b=e.target.closest('.key'); if(b) press(b.dataset.k);
+});
+$('#sciGrid').addEventListener('click', e=>{
+  const b=e.target.closest('.skey'); if(b) pressSci(b.dataset.s);
+});
+$('#degToggle').onclick=function(){
+  deg=!deg; this.textContent = deg ? 'DEG · 角度' : 'RAD · 弧度';
+  const v=evaluate(); if(v!==null) resultEl.textContent=fmtAuto(v);
+};
+document.querySelector('.mode-row').addEventListener('click', e=>{
+  const c=e.target.closest('.mode-chip'); if(!c) return;
+  if(c.dataset.m==='rate'){ toast('汇率模式即将上线'); return; }
+  document.querySelectorAll('.mode-chip').forEach(x=>x.classList.toggle('active',x===c));
+  $('#sciWrap').classList.toggle('show', c.dataset.m==='sci');
+});
+
+/* ── 历史列表 ─────────────────────────── */
+function inFilter(it){
+  if(filter==='fav')  return it.fav;
+  if(filter==='today') return Date.now()-it.ts < DAY && new Date(it.ts).toDateString()===new Date().toDateString();
+  if(filter==='week') return Date.now()-it.ts < 7*DAY;
+  return true;
+}
+function matches(it){
+  if(!query) return true;
+  const q=query.toLowerCase();
+  return (it.expr+' '+it.result+' '+(it.note||'')).toLowerCase().includes(q);
+}
+function renderList(){
+  // 计数徽章
+  countEl.textContent = history.length+' 条';
+  // 筛选标签计数
+  document.querySelectorAll('.filter-chip').forEach(c=>{
+    const f=c.dataset.f;
+    const n=history.filter(it=>{
+      if(f==='fav') return it.fav;
+      if(f==='today') return new Date(it.ts).toDateString()===new Date().toDateString();
+      if(f==='week') return Date.now()-it.ts<7*DAY;
+      return true;
+    }).length;
+    c.textContent = {all:'全部',fav:'已收藏',today:'今天',week:'本周'}[f] + (f==='all'?' · '+n:n);
+  });
+  // 元信息
+  if(query){
+    const n=history.filter(it=>matches(it)&&inFilter(it)).length;
+    metaEl.textContent='找到 '+n+' 条与「'+query+'」相关的记录';
+    metaEl.className='meta-match';
+  }else{
+    metaEl.textContent='全部记录';
+    metaEl.className='meta-neutral';
+  }
+  // 列表
+  listEl.innerHTML='';
+  const visible = history.filter(inFilter);
+  let hasDim=false;
+  if(visible.length===0){
+    listEl.innerHTML='<div class="empty">暂无记录，去左侧算一笔吧</div>';
+    return;
+  }
+  visible.forEach(it=>{
+    const hit=matches(it);
+    if(!hit){ hasDim=true; }
+    const el=document.createElement('div');
+    el.className='item'+(hit?'':' dim');
+    el.innerHTML=
+      '<div class="item-row"><span class="item-expr"></span><span class="item-time">'+timeLabel(it.ts)+'</span></div>'+
+      '<div class="item-row"><span class="item-result">= '+it.result+'</span>'+
+        '<span class="item-actions">'+
+          '<button class="icon-btn'+(it.fav?' fav-on':'')+'" data-a="fav" title="收藏"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.2 9.4l6.1-.8L12 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>'+
+          '<button class="icon-btn" data-a="copy" title="复制结果"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15V6a2 2 0 012-2h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>'+
+          '<button class="icon-btn" data-a="reuse" title="复用表达式"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 5v6a4 4 0 01-4 4H5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 11l-4 4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'+
+          '<button class="icon-btn" data-a="note" title="写备注（可搜索）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2H6a2 2 0 00-2 2v6l8.3 8.3a2 2 0 002.8 0l5.2-5.2a2 2 0 000-2.8L12 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7.5" cy="7.5" r="1" fill="currentColor"/></svg></button>'+
+        '</span></div>'+
+      (it.note?'<span class="note-chip"></span>':'<span class="note-chip note-add" title="双击任意记录添加备注">＋ 备注</span>');
+    el.querySelector('.item-expr').textContent=it.expr;
+    if(it.note) el.querySelector('.note-chip').textContent=it.note;
+    el.querySelector('[data-a="fav"]').onclick=()=>{ it.fav=!it.fav; save(); renderList(); };
+    el.querySelector('[data-a="copy"]').onclick=()=>{ navigator.clipboard.writeText(it.result).then(()=>toast('已复制 '+it.result)); };
+    el.querySelector('[data-a="reuse"]').onclick=()=>{ expr=it.expr.replace(/\s*=\s*$/,''); renderCalc(); toast('已复用表达式'); };
+    const editNote=()=>{
+      const v=prompt('备注（写入「利率」等关键词即可被搜索）：', it.note||'');
+      if(v!==null){ it.note=v.trim(); save(); renderList(); if(it.note) toast('备注已保存，可被搜索'); }
+    };
+    el.querySelector('[data-a="note"]').onclick=()=>editNote();
+    /* 双击记录任意位置同样可写备注 */
+    el.ondblclick=()=>editNote();
+    listEl.appendChild(el);
+    // 搜索态：匹配项之后插入「今天的其他记录」分组标签
+    if(query && hasDim && hit===false && !listEl.querySelector('.group-label')){
+      const label=document.createElement('div');
+      label.className='group-label'; label.textContent='今天的其他记录';
+      listEl.insertBefore(label, el);
+      hasDim=false; // 保证标签只插一次
+    }
+  });
+}
+
+/* ── 搜索 / 筛选 / 其他交互 ───────────── */
+searchEl.addEventListener('input', ()=>{ query=searchEl.value.trim(); renderList(); });
+searchEl.addEventListener('keydown', e=>{ if(e.key==='Escape'){ searchEl.value=''; query=''; renderList(); searchEl.blur(); } });
+document.addEventListener('keydown', e=>{
+  if(e.key==='/' && document.activeElement!==searchEl){ e.preventDefault(); searchEl.focus(); return; }
+  if(document.activeElement===searchEl) return;
+  if(e.key==='Enter') press('=');
+  else if(e.key==='Backspace') press('back');
+  else if(e.key==='Escape') press('C');
+  else if(/^[0-9]$/.test(e.key)) press(e.key);
+  else if('+-*.%'.includes(e.key) && e.key!=='.') press(e.key==='*'?'×':e.key);
+  else if(e.key==='^') press('^');
+  else if(e.key==='.') press('.');
+});
+$('#filterRow').addEventListener('click', e=>{
+  const c=e.target.closest('.filter-chip'); if(!c) return;
+  filter=c.dataset.f;
+  document.querySelectorAll('.filter-chip').forEach(x=>x.classList.toggle('active',x===c));
+  renderList();
+});
+$('#btnClear').onclick=()=>{
+  if(confirm('确定清空全部历史记录？此操作不可恢复。')){
+    history=[]; save(); renderList(); toast('已清空全部记录');
+  }
+};
+$('#btnExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify(history,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='算迹计算器-历史记录.json'; a.click();
+  URL.revokeObjectURL(a.href); toast('已导出 '+history.length+' 条记录');
+};
+
+/* 初始化 */
+renderCalc(); renderList();
+</script>
+</body>
+</html>
